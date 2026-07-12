@@ -1,3 +1,2 @@
 paramiko
 cryptography
-windows-curses
