@@ -38,7 +38,7 @@ class EncryptedFlatStore:
 if __name__ == "__main__":
     import getpass
     passphrase = getpass.getpass("Enter storage passphrase: ")
-    store = EncryptedFlatStore("data/alic_chat.dat", passphrase)
+    store = EncryptedFlatStore("data/alice_chat.dat", passphrase)
     store.append("alice", 1234567890.0, "hello")
     print("Saved. Stored messages stored so far: ")
     for m in store.messages:
