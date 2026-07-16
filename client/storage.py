@@ -28,7 +28,7 @@ class EncryptedFlatStore:
         nonce = os.urandom(12)
         plaintext = json.dumps(self.messages).encode()
         ciphertext = AESGCM(self.key).encrypt(nonce, plaintext, None)
-        with open(self.path, "w") as f:
+        with open(self.path, "wb") as f:
             f.write(self.salt + nonce +ciphertext)
 
     def append(self, sender, timestamp, content):
