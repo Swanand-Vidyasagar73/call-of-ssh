@@ -34,5 +34,8 @@ def lookup_username(fingerprint):
 
 if __name__ == "__main__":
     fp = register_user("alice", "keys/alice_id_ed25519.pub")
+    fp2 = register_user("bob", "keys/bob_id_ed25519.pub")
     print(f"Registered Alice as {fp}")
     print(lookup_username(fp))
+    print(f"Registered Bob as {fp2}")
+    print(lookup_username(fp2))

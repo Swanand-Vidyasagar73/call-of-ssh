@@ -25,7 +25,7 @@ def main():
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect((RELAY_HOST, RELAY_PORT))
-    sock.sendall(USERNAME.encode())   # handshake: register this username with the relay
+    sock.sendall((USERNAME + "\n").encode())   # handshake: register this username with the relay (newline-terminated)
 
     def on_send(text):
         payload = make_message(USERNAME, text).encode()
@@ -64,7 +64,6 @@ def main():
 
     while True:
         time.sleep(0.5)   # keep main thread alive; UI + receive_loop run in background threads
-
 
 if __name__ == "__main__":
     main()

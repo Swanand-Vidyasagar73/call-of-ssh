@@ -10,32 +10,69 @@ lock = threading.Lock()
 
 
 def handle_client(conn, addr):
-    username = conn.recv(1024).decode().strip()  # client sends its username first
-    with lock:
-        connected_peers[username] = conn
-    print(f"[relay] {username} connected from {addr}")
-
+    buf = b""
+    username = None
     try:
+        # --- handshake: first line must be "<username>\n" ---
+        while username is None:
+            chunk = conn.recv(4096)
+            if not chunk:
+                conn.close()
+                return  # disconnected before handshake
+            buf += chunk
+            if b"\n" in buf:
+                line, buf = buf.split(b"\n", 1)
+                username = line.decode().strip()
+                with lock:
+                    if username in connected_peers:
+                        conn.sendall(b"ERROR|username-taken\n")
+                        conn.close()
+                        return
+                    connected_peers[username] = conn
+                print(f"[relay] {username} connected from {addr}")
+
+        # --- message loop: one "target|json" line at a time ---
         while True:
-            data = conn.recv(4096)
-            if not data:
-                break
-            # wire format from client: "target_username|<encrypted_payload_bytes>"
-            target, _, payload = data.partition(b"|")
-            target = target.decode()
+            while b"\n" not in buf:
+                chunk = conn.recv(4096)
+                if not chunk:
+                    return  # client disconnected (cleanup in finally)
+                buf += chunk
+            line, buf = buf.split(b"\n", 1)
+            if not line.strip():
+                continue
+            # wire format per line: "target_username|<json_payload>"
+            target, _, payload = line.partition(b"|")
+            target = target.decode().strip()
+            if not target or not payload:
+                continue  # malformed line, ignore
             with lock:
                 target_conn = connected_peers.get(target)
             if target_conn:
-                target_conn.sendall(payload)
-            # if target isn't online right now, payload is dropped —
-            # true statelessness means no offline queue unless explicitly added
+                try:
+                    target_conn.sendall(payload + b"\n")
+                except OSError:
+                    pass  # target died mid-send; drop (offline queue = future work)
+            else:
+                # target offline — tell sender instead of dropping silently
+                try:
+                    conn.sendall(b"ERROR|user-offline\n")
+                except OSError:
+                    pass
     finally:
-        with lock:
-            connected_peers.pop(username, None)
-        conn.close()
-        print(f"[relay] {username} disconnected")
-
-
+        if username:
+            with lock:
+                # only remove if it's still our conn (don't kick a newer login)
+                if connected_peers.get(username) is conn:
+                    connected_peers.pop(username, None)
+            print(f"[relay] {username} disconnected")
+        else:
+            print(f"[relay] connection from {addr} closed before handshake")
+        try:
+            conn.close()
+        except OSError:
+            pass
+    
 def main():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
